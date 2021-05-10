@@ -34,7 +34,7 @@ void r_reset(c_6502 * CPU){
     REG->PC = CPU->ROM_HEADER; //TODO: CHANGE TO RESET TO RELAVENT POINT
     REG->A = REG->X = REG->Y = 0;
     PROC_FLAGS* flags = &REG->flags.f;
-    flags->C = flags->Z = flags->I = flags->D = flags->B = flags->O = flags->N = 0;
+    flags->C = flags->Z = flags->I = flags->D = flags->B = flags->V = flags->N = 0;
 }
 uint8_t  fetch_byte(c_6502* CPU){
     uint8_t byte = CPU->MEM[CPU->REG.PC];
@@ -121,7 +121,7 @@ void gen_LOG(c_6502* CPU, LOGICAL_OP OP, ADDR_MD AM){
             CPU->REG.A &= byte;
             break;
         case OP_EOR:
-            CPU->REG.A &= byte;
+            CPU->REG.A ^= byte;
             break;
         case OP_ORA:
             CPU->REG.A |= byte;
@@ -130,6 +130,29 @@ void gen_LOG(c_6502* CPU, LOGICAL_OP OP, ADDR_MD AM){
     F_ZERO(CPU->REG.A);
     F_NEG(CPU->REG.A);
 }
+
+void gen_ADD(c_6502* CPU, ADDR_MD AM){
+    uint8_t acc = CPU->REG.A;
+    uint8_t byte = get_byte(CPU,AM);
+    CPU->REG.A += byte + (flags(CPU).C);
+    F_ZERO(CPU->REG.A);
+    F_NEG(CPU->REG.A);
+
+    flags(CPU).C = (acc >> 7 != byte >> 7) && (acc>>7 != CPU->REG.A >> 7); //If signs are different and result of sign changed then carry
+    flags(CPU).V = (acc >> 7 == byte >> 7) && (acc>>7 != CPU->REG.A >> 7);
+
+}
+void gen_SUB(c_6502* CPU, ADDR_MD AM){
+    uint8_t acc = CPU->REG.A;
+    uint8_t byte = get_byte(CPU,AM);
+    CPU->REG.A = acc - byte - (1-flags(CPU).C);
+
+    flags(CPU).C = (byte >> 7 == acc >> 7 ) && ((CPU->REG.A >> 7) == (acc>>7));
+    flags(CPU).V = (byte >> 7 != acc >> 7 ) && ((CPU->REG.A >> 7) != (acc>>7));
+    F_ZERO(CPU->REG.A);
+    F_NEG(CPU->REG.A);
+}
+
 /*TODO:
  * Using: http://www.obelisk.me.uk/6502/instructions.html
  * Load and Store DONE?
@@ -380,9 +403,60 @@ int execute(c_6502* CPU){
             gen_LOG(CPU,OP_ORA,AM_INDY);
             break;
 
+        /*ADC - add with carry */
+        case 0x69:  //immediate
+            gen_ADD(CPU,AM_IMM);
+            break;
+        case 0x65:  //zero page
+            gen_ADD(CPU,AM_ZP);
+            break;
+        case 0x75:  //zero page X
+            gen_ADD(CPU,AM_ZPX);
+            break;
+        case 0x6D:  //absolute
+            gen_ADD(CPU,AM_ABS);
+            break;
+        case 0x7D:  //absolute X
+            gen_ADD(CPU,AM_ABSX);
+            break;
+        case 0x79:  //absolute Y
+            gen_ADD(CPU,AM_ABSY);
+            break;
+        case 0x61:  //indirect X
+            gen_ADD(CPU,AM_INDX);
+            break;
+        case 0x71:  //indirect Y
+            gen_ADD(CPU,AM_INDY);
+            break;
 
+        /*SBC - subtract with carry */
+        case 0xE9:  //immediate
+            gen_SUB(CPU,AM_IMM);
+            break;
+        case 0xE5:  //zero page
+            gen_SUB(CPU,AM_ZP);
+            break;
+        case 0xF5:  //zero page X
+            gen_SUB(CPU,AM_ZPX);
+            break;
+        case 0xED:  //absolute
+            gen_SUB(CPU,AM_ABS);
+            break;
+        case 0xFD:  //absolute X
+            gen_SUB(CPU,AM_ABSX);
+            break;
+        case 0xF9:  //absolute Y
+            gen_SUB(CPU,AM_ABSY);
+            break;
+        case 0xE1:  //indirect X
+            gen_SUB(CPU,AM_INDX);
+            break;
+        case 0xF1:  //indirect Y
+            gen_SUB(CPU,AM_INDY);
+            break;
 
         default:
+            printf("Unknown instruction: %x \n. Exiting",instr);
             return 1;
     }
     return 0;

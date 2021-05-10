@@ -42,12 +42,12 @@ typedef struct{
     * Absolute : use full 16 bit address to identify target location (used in jumps)
     * Indirect : use 16 bit address , identifies location of least significant byte of another 16 bit memory address, uses that as real target
     */
-    uint8_t  C : 1; //carry flag | set if last operation caused oveflow from bit 7 or underflow of from bit 0
-    uint8_t  Z : 1; //zero flag | set if result of last operation was zero
-    uint8_t  I : 1; //interrupt disable | while set, processor will not respond to interrupts
+    uint8_t  C : 1; //carry flag
+    uint8_t  Z : 1; //zero flag
+    uint8_t  I : 1; //interrupt disable
     uint8_t  D : 1; //decimal mode
     uint8_t  B : 1; //break mode
-    uint8_t  O : 1; //overflow flag
+    uint8_t  V : 1; //overflow flag
     uint8_t  N : 1; //negative flag
 }PROC_FLAGS;
 typedef struct {
