@@ -8,9 +8,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
-
+#include <assert.h>
 #define EMUL6502_CPU6502_H
-#define PROGRAM_START 0x0600
+#define STACK_START 0x0100
+
 typedef enum{
     AM_IMP, //implicit
     AM_ACC, //accumulator
@@ -28,6 +29,14 @@ typedef enum{
 }ADDR_MD;
 typedef struct{
     //PROCESSOR FLAG STATES
+    /*Addressing modes:
+    * Implicit : when source and dest are implicit to the function or not relevant (eg. Clear Carry Flag CLC or Return from Subroutine RTS)
+    * Immediate: uses directly specified 8 bit constant within instruction (load LO load HI)
+    * Zero Page: uses zero page and 0x0000-0x00ff, from immediate or relevant register
+    * Relative : uses 8 bit offset (-127 - 126) which is added to current PC value (used in branches)
+    * Absolute : use full 16 bit address to identify target location (used in jumps)
+    * Indirect : use 16 bit address , identifies location of least significant byte of another 16 bit memory address, uses that as real target
+    */
     uint8_t  C : 1; //carry flag | set if last operation caused oveflow from bit 7 or underflow of from bit 0
     uint8_t  Z : 1; //zero flag | set if result of last operation was zero
     uint8_t  I : 1; //interrupt disable | while set, processor will not respond to interrupts
@@ -37,6 +46,7 @@ typedef struct{
     uint8_t  N : 1; //negative flag
 }PROC_FLAGS;
 typedef struct {
+
     uint16_t PC; //program counter
     /* 16 bit register points to next instruction to be executed*/
 
@@ -58,22 +68,20 @@ typedef struct {
 }r_6502;
 
 typedef struct{
+    uint16_t ROM_HEADER;
     uint8_t MEM[0xFFFF]; // processor memory
     /* 64kB indexed from 0x0000 to 0xffff
-     * Addressing modes:
-     * Implicit : when source and dest are implicit to the function or not relevant (eg. Clear Carry Flag CLC or Return from Subroutine RTS)
-     * Immediate: uses directly specified 8 bit constant within instruction (load LO load HI)
-     * Zero Page: uses zero page and 0x0000-0x00ff, from immediate or relevant register
-     * Relative : uses 8 bit offset (-127 - 126) which is added to current PC value (used in branches)
-     * Absolute : use full 16 bit address to identify target location (used in jumps)
-     * Indirect : use 16 bit address , identifies location of least significant byte of another 16 bit memory address, uses that as real target
+     * 0x0100-0x01ff STACK
+     * 0x0600-0x0
+     *
      */
+
     r_6502 REG;
 }c_6502;
-c_6502* c_init();
+c_6502* c_init(uint16_t);
 void c_reset(c_6502*);
 void m_reset(c_6502*);
-void r_reset(r_6502*);
+void r_reset(c_6502*);
 void c_destroy(c_6502*);
 uint8_t fetch_byte(c_6502*);
 uint16_t fetch_word(c_6502*);

@@ -7,15 +7,21 @@
 #define F_ZERO(v) flags(CPU).Z = (v==0)
 #define F_NEG(v) flags(CPU).N = (v>>7)==1
 
-c_6502* c_init(){
+c_6502* c_init(uint16_t ROM_SIZE){
+    if(ROM_SIZE <= 1024 || ROM_SIZE > (32*1024)){
+        printf("ROM SIZE OUTSIDE VALID RANGE (1-32kB), EXITING\n");
+        return NULL;
+    }
+    ROM_SIZE &= 0xFF00;
+    uint16_t ROM_HEADER = 0xFFFF-(ROM_SIZE&0xFF00)+1; //Adjusting size to be on page boundary
     c_6502* CPU = malloc(sizeof(c_6502));
-    m_reset(CPU);
-    r_reset(&CPU->REG);
+    CPU->ROM_HEADER=ROM_HEADER;
+    c_reset(CPU);
     return CPU;
 }
 void c_reset(c_6502* CPU){
     m_reset(CPU);
-    r_reset(&CPU->REG);
+    r_reset(CPU);
 }
 void c_destroy(c_6502* CPU){
     free(CPU);
@@ -23,8 +29,9 @@ void c_destroy(c_6502* CPU){
 void m_reset(c_6502* CPU){
     for(uint16_t  i = 0; i < 0xFFFF; i ++) CPU->MEM[i]=0x00;
 }
-void r_reset(r_6502* REG){
-    REG->PC = PROGRAM_START; //TODO: CHANGE TO RESET TO RELAVENT POINT
+void r_reset(c_6502 * CPU){
+    r_6502* REG = &CPU->REG;
+    REG->PC = CPU->ROM_HEADER; //TODO: CHANGE TO RESET TO RELAVENT POINT
     REG->A = REG->X = REG->Y = 0x00;
     PROC_FLAGS* flags = &REG->flags.f;
     flags->C = flags->Z = flags->I = flags->D = flags->B = flags->O = flags->N = 0;
@@ -106,7 +113,7 @@ void gen_TRANS(c_6502* CPU, uint8_t* REG_D, uint8_t* REG_T){
 
 /*TODO:
  * Using: http://www.obelisk.me.uk/6502/instructions.html
- * Load and Store - add all addressing modes
+ * Load and Store - ADD indirect addressing modes
  * Register transfers DONE
  * Stack operations DONE
  * logical AND EOR ORA BIT
