@@ -3,7 +3,6 @@
 //
 
 #include "cpu6502.h"
-
 #define flags(c) c->REG.flags.f
 #define F_ZERO(v) flags(CPU).Z = (v==0)
 #define F_NEG(v) flags(CPU).N = (v>>7)==1
@@ -25,7 +24,7 @@ void m_reset(c_6502* CPU){
     for(uint16_t  i = 0; i < 0xFFFF; i ++) CPU->MEM[i]=0x00;
 }
 void r_reset(r_6502* REG){
-    REG->PC = 0x0000; //TODO: CHANGE TO RESET TO RELAVENT POINT
+    REG->PC = PROGRAM_START; //TODO: CHANGE TO RESET TO RELAVENT POINT
     REG->A = REG->X = REG->Y = 0x00;
     PROC_FLAGS* flags = &REG->flags.f;
     flags->C = flags->Z = flags->I = flags->D = flags->B = flags->O = flags->N = 0;
@@ -61,39 +60,40 @@ void store_word(c_6502* CPU, uint16_t addr, uint16_t word){
     CPU->MEM[addr+1] = hi;
 }
 //Addressing Modes
+uint16_t get_addr(c_6502* CPU, ADDR_MD AM){
+    switch (AM){
+        case (AM_ZP): return fetch_byte(CPU);
+        case (AM_ZPX): return (fetch_byte(CPU) + CPU->REG.X);
+        case (AM_ZPY): return (fetch_byte(CPU) + CPU->REG.Y);
+        case (AM_ABS): return fetch_word(CPU);
+        case (AM_ABSX): return fetch_word(CPU) + CPU->REG.X;
+        case (AM_ABSY): return fetch_word(CPU) + CPU->REG.Y;
+        //TODO: implement indirection
+        default:
+            return 0x0000; //if implicit, immediate or accumulator no relevant address, default to 0x0000 (this is undefined behaviour)
+    }
+}
+uint8_t get_byte(c_6502* CPU, ADDR_MD AM){
+    switch(AM){
+        case AM_IMP: return 0x00; //TODO: raise error, this is undefined behaviour - should not access memory with implicit type
+        case AM_ACC: return CPU->REG.A;
+        case AM_IMM: return fetch_byte(CPU);
+        default:
+            return load_byte(CPU, get_addr(CPU,AM));
+
+    }
+}
 
 /*Generic Load instruction - used to implement LDA, LDX, LDY*/
 void gen_LD(c_6502* CPU, uint8_t* REG, ADDR_MD AM){
-    //TODO: implement ZPX, ABSX
-    switch (AM){
-        case (AM_IMM):
-            *REG = fetch_byte(CPU);
-            break;
-        case (AM_ZP):
-            *REG = load_byte(CPU, fetch_byte(CPU));
-            break;
-        case (AM_ABS):
-            *REG = load_byte(CPU, fetch_word(CPU));
-            break;
-        default: //TODO: raise error
-            return;
-    }
+    uint8_t byte = get_byte(CPU,AM);
+    *REG = byte;
     F_NEG(*REG);
     F_ZERO(*REG);
 }
 //generic store instruction
 void gen_ST(c_6502* CPU, uint8_t* REG, ADDR_MD AM){
-    uint16_t addr;
-    switch (AM){
-        case(AM_ZP):
-            addr = fetch_byte(CPU);
-            break;
-        case (AM_ABS):
-            addr = fetch_word(CPU);
-            break;
-        default: //TODO: raise error
-            break;
-    }
+    uint16_t addr = get_addr(CPU,AM);
     store_byte(CPU,addr,*REG);
 }
 //generic transfer instruction
@@ -109,7 +109,7 @@ void gen_TRANS(c_6502* CPU, uint8_t* REG_D, uint8_t* REG_T){
  * Load and Store - add all addressing modes
  * Register transfers DONE
  * Stack operations DONE
- * logical
+ * logical AND EOR ORA BIT
  * arithmetic
  * increments decrements
  * shifts
@@ -129,8 +129,17 @@ int execute(c_6502* CPU){
         case 0xA5: // zero paged
             gen_LD(CPU,&CPU->REG.A, AM_ZP);
             break;
+        case 0xB5: //zero paged X
+            gen_LD(CPU,&CPU->REG.A,AM_ZPX);
+            break;
         case 0xAD:  //absolute
             gen_LD(CPU,&CPU->REG.A, AM_ABS);
+            break;
+        case 0xBD: //absolute X
+            gen_LD(CPU,&CPU->REG.A,AM_ABSX);
+            break;
+        case 0xB9: //absolute Y
+            gen_LD(CPU,&CPU->REG.A,AM_ABSY);
             break;
 
         /*LDX - Load X */
@@ -140,10 +149,15 @@ int execute(c_6502* CPU){
         case 0xA6:  // zero paged
             gen_LD(CPU,&CPU->REG.X, AM_ZP);
             break;
+        case 0xB6: //zero paged Y
+            gen_LD(CPU,&CPU->REG.X,AM_ZPY);
+            break;
         case 0xAE:  //absolute
             gen_LD(CPU,&CPU->REG.X, AM_ABS);
             break;
-
+        case 0xBE: //absolute Y
+            gen_LD(CPU,&CPU->REG.X,AM_ABSY);
+            break;
         /*LDY - Load Y */
         case 0xA0: //zero paged
             gen_LD(CPU,&CPU->REG.Y,AM_IMM);
@@ -151,20 +165,40 @@ int execute(c_6502* CPU){
         case 0xA4:  // zero paged
             gen_LD(CPU,&CPU->REG.Y, AM_ZP);
             break;
+        case 0xB4:  // zero paged X
+            gen_LD(CPU,&CPU->REG.Y, AM_ZPX);
+            break;
         case 0xAC:  //absolute
             gen_LD(CPU,&CPU->REG.Y, AM_ABS);
             break;
+        case 0xBC: //absolute X
+            gen_LD(CPU,&CPU->REG.Y,AM_ABSX);
+            break;
+
 
         /* STA - Store Accumulator */
         case 0x85: //zero paged
             gen_ST(CPU, &CPU->REG.A, AM_ZP);
             break;
+        case 0x95: //zero paged X
+            gen_ST(CPU, &CPU->REG.A, AM_ZPX);
+            break;
         case  0x8D: //absolute address
             gen_ST(CPU, &CPU->REG.A, AM_ABS);
             break;
+        case  0x9D: //absolute address X
+            gen_ST(CPU, &CPU->REG.A, AM_ABSX);
+            break;
+        case  0x99: //absolute address Y
+            gen_ST(CPU, &CPU->REG.A, AM_ABSY);
+            break;
+
         /* STX - Store Accumulator */
         case 0x86: //zero paged
             gen_ST(CPU, &CPU->REG.X, AM_ZP);
+            break;
+        case 0x96: //zero paged Y
+            gen_ST(CPU, &CPU->REG.X, AM_ZPY);
             break;
         case  0x8E: //absolute address
             gen_ST(CPU, &CPU->REG.X, AM_ABS);
@@ -172,6 +206,9 @@ int execute(c_6502* CPU){
         /* STY - Store Accumulator */
         case 0x84: //zero paged
             gen_ST(CPU, &CPU->REG.Y, AM_ZP);
+            break;
+        case 0x94: //zero paged X
+            gen_ST(CPU, &CPU->REG.Y, AM_ZPX);
             break;
         case  0x8C: //absolute address
             gen_ST(CPU, &CPU->REG.Y, AM_ABS);
@@ -217,8 +254,11 @@ int execute(c_6502* CPU){
         case 0x68:
             CPU->REG.A = load_byte(CPU, CPU->REG.S);
             CPU->REG.S ++;
+            F_ZERO(CPU->REG.A);
+            F_NEG(CPU->REG.A);
             break;
         /*PLP - pull processor status */
+        case 0x28:
             CPU->REG.flags.v = load_byte(CPU, CPU->REG.S);
             CPU->REG.S ++;
             break;

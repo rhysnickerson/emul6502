@@ -10,6 +10,7 @@
 #include <stdio.h>
 
 #define EMUL6502_CPU6502_H
+#define PROGRAM_START 0x0600
 typedef enum{
     AM_IMP, //implicit
     AM_ACC, //accumulator
