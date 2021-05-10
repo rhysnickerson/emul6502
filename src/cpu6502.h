@@ -24,9 +24,14 @@ typedef enum{
     AM_ABSX, //absolute X
     AM_ABSY, //absolute Y
     AM_IND, //Indirect
-    AM_XIND, //indexed indirect
-    AM_INDX //indirect indexed
+    AM_INDX, //indexed indirect
+    AM_INDY //indirect indexed
 }ADDR_MD;
+typedef enum{
+    OP_AND,
+    OP_EOR,
+    OP_ORA
+}LOGICAL_OP;
 typedef struct{
     //PROCESSOR FLAG STATES
     /*Addressing modes:

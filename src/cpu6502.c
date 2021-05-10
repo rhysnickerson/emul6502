@@ -32,7 +32,7 @@ void m_reset(c_6502* CPU){
 void r_reset(c_6502 * CPU){
     r_6502* REG = &CPU->REG;
     REG->PC = CPU->ROM_HEADER; //TODO: CHANGE TO RESET TO RELAVENT POINT
-    REG->A = REG->X = REG->Y = 0x00;
+    REG->A = REG->X = REG->Y = 0;
     PROC_FLAGS* flags = &REG->flags.f;
     flags->C = flags->Z = flags->I = flags->D = flags->B = flags->O = flags->N = 0;
 }
@@ -75,6 +75,10 @@ uint16_t get_addr(c_6502* CPU, ADDR_MD AM){
         case (AM_ABS): return fetch_word(CPU);
         case (AM_ABSX): return fetch_word(CPU) + CPU->REG.X;
         case (AM_ABSY): return fetch_word(CPU) + CPU->REG.Y;
+        case (AM_IND): return load_word(CPU,fetch_word(CPU));
+        case (AM_INDX): return load_word(CPU, fetch_byte(CPU)+CPU->REG.X);
+        case (AM_INDY): return load_word(CPU, fetch_byte(CPU))+CPU->REG.Y;
+
         //TODO: implement indirection
         default:
             return 0x0000; //if implicit, immediate or accumulator no relevant address, default to 0x0000 (this is undefined behaviour)
@@ -109,14 +113,29 @@ void gen_TRANS(c_6502* CPU, uint8_t* REG_D, uint8_t* REG_T){
     F_ZERO(*REG_D);
     F_NEG(*REG_D);
 }
+void gen_LOG(c_6502* CPU, LOGICAL_OP OP, ADDR_MD AM){
 
-
+    uint8_t  byte = get_byte(CPU,AM);
+    switch (OP){
+        case OP_AND:
+            CPU->REG.A &= byte;
+            break;
+        case OP_EOR:
+            CPU->REG.A &= byte;
+            break;
+        case OP_ORA:
+            CPU->REG.A |= byte;
+            break;
+    }
+    F_ZERO(CPU->REG.A);
+    F_NEG(CPU->REG.A);
+}
 /*TODO:
  * Using: http://www.obelisk.me.uk/6502/instructions.html
- * Load and Store - ADD indirect addressing modes
+ * Load and Store DONE?
  * Register transfers DONE
  * Stack operations DONE
- * logical AND EOR ORA BIT
+ * logical DONE?
  * arithmetic
  * increments decrements
  * shifts
@@ -148,6 +167,12 @@ int execute(c_6502* CPU){
         case 0xB9: //absolute Y
             gen_LD(CPU,&CPU->REG.A,AM_ABSY);
             break;
+        case 0xA1: //(indirect,X)
+            gen_LD(CPU,&CPU->REG.A,AM_INDX);
+            break;
+        case 0xB1: //(indirect),Y
+            gen_LD(CPU,&CPU->REG.A,AM_INDY);
+            break;
 
         /*LDX - Load X */
         case 0xA2: //zero paged
@@ -165,6 +190,7 @@ int execute(c_6502* CPU){
         case 0xBE: //absolute Y
             gen_LD(CPU,&CPU->REG.X,AM_ABSY);
             break;
+
         /*LDY - Load Y */
         case 0xA0: //zero paged
             gen_LD(CPU,&CPU->REG.Y,AM_IMM);
@@ -196,8 +222,14 @@ int execute(c_6502* CPU){
         case  0x9D: //absolute address X
             gen_ST(CPU, &CPU->REG.A, AM_ABSX);
             break;
-        case  0x99: //absolute address Y
+        case 0x99: //absolute address Y
             gen_ST(CPU, &CPU->REG.A, AM_ABSY);
+            break;
+        case 0x81: //(indirect,X)
+            gen_ST(CPU,&CPU->REG.A,AM_INDX);
+            break;
+        case 0x91: //(indirect),Y
+            gen_ST(CPU,&CPU->REG.A,AM_INDY);
             break;
 
         /* STX - Store Accumulator */
@@ -257,7 +289,7 @@ int execute(c_6502* CPU){
             CPU->REG.S --;
             store_byte(CPU, (0x0100 | CPU->REG.S), CPU->REG.flags.v);
             break;
-        /*PLA - pul accumulator */
+        /*PLA - pull accumulator */
         case 0x68:
             CPU->REG.A = load_byte(CPU, CPU->REG.S);
             CPU->REG.S ++;
@@ -269,6 +301,87 @@ int execute(c_6502* CPU){
             CPU->REG.flags.v = load_byte(CPU, CPU->REG.S);
             CPU->REG.S ++;
             break;
+
+        /*AND - logical and */
+        case 0x29: //immediate
+            gen_LOG(CPU,OP_AND,AM_IMM);
+            break;
+        case 0x25: //zero page
+            gen_LOG(CPU,OP_AND,AM_ZP);
+            break;
+        case 0x35: //zero page X
+            gen_LOG(CPU,OP_AND,AM_ZPX);
+            break;
+        case 0x2D: //absolute
+            gen_LOG(CPU,OP_AND,AM_ABS);
+            break;
+        case 0x3D: //absolute X
+            gen_LOG(CPU,OP_AND,AM_ABSX);
+            break;
+        case 0x39: //absolute Y
+            gen_LOG(CPU,OP_AND,AM_ABSY);
+            break;
+        case 0x21: //indirect X
+            gen_LOG(CPU,OP_AND,AM_INDX);
+            break;
+        case 0x31: //indirect Y
+            gen_LOG(CPU,OP_AND,AM_INDY);
+            break;
+
+        /*EOR - logical Exclusive OR */
+        case 0x49: //immediate
+            gen_LOG(CPU,OP_EOR,AM_IMM);
+            break;
+        case 0x45: //zero page
+            gen_LOG(CPU,OP_EOR,AM_ZP);
+            break;
+        case 0x55: //zero page X
+            gen_LOG(CPU,OP_EOR,AM_ZPX);
+            break;
+        case 0x4D: //absolute
+            gen_LOG(CPU,OP_EOR,AM_ABS);
+            break;
+        case 0x5D: //absolute X
+            gen_LOG(CPU,OP_EOR,AM_ABSX);
+            break;
+        case 0x59: //absolute Y
+            gen_LOG(CPU,OP_EOR,AM_ABSY);
+            break;
+        case 0x41: //indirect X
+            gen_LOG(CPU,OP_EOR,AM_INDX);
+            break;
+        case 0x51: //indirect Y
+            gen_LOG(CPU,OP_EOR,AM_INDY);
+            break;
+
+        /*ORA - logical inclusive OR */
+        case 0x09: //immediate
+            gen_LOG(CPU,OP_ORA,AM_IMM);
+            break;
+        case 0x05: //zero page
+            gen_LOG(CPU,OP_ORA,AM_ZP);
+            break;
+        case 0x15: //zero page X
+            gen_LOG(CPU,OP_ORA,AM_ZPX);
+            break;
+        case 0x0D: //absolute
+            gen_LOG(CPU,OP_ORA,AM_ABS);
+            break;
+        case 0x1D: //absolute X
+            gen_LOG(CPU,OP_ORA,AM_ABSX);
+            break;
+        case 0x19: //absolute Y
+            gen_LOG(CPU,OP_ORA,AM_ABSY);
+            break;
+        case 0x01: //indirect X
+            gen_LOG(CPU,OP_ORA,AM_INDX);
+            break;
+        case 0x11: //indirect Y
+            gen_LOG(CPU,OP_ORA,AM_INDY);
+            break;
+
+
+
         default:
             return 1;
     }
