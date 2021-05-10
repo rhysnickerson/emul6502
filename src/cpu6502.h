@@ -25,7 +25,16 @@ typedef enum{
     AM_XIND, //indexed indirect
     AM_INDX //indirect indexed
 }ADDR_MD;
-
+typedef struct{
+    //PROCESSOR FLAG STATES
+    uint8_t  C : 1; //carry flag | set if last operation caused oveflow from bit 7 or underflow of from bit 0
+    uint8_t  Z : 1; //zero flag | set if result of last operation was zero
+    uint8_t  I : 1; //interrupt disable | while set, processor will not respond to interrupts
+    uint8_t  D : 1; //decimal mode
+    uint8_t  B : 1; //break mode
+    uint8_t  O : 1; //overflow flag
+    uint8_t  N : 1; //negative flag
+}PROC_FLAGS;
 typedef struct {
     uint16_t PC; //program counter
     /* 16 bit register points to next instruction to be executed*/
@@ -40,15 +49,11 @@ typedef struct {
     uint8_t  X,Y; //index registers
     /* Index registers used in operations, can be read to/written from memory
      * X register can copy address of SP */
+    union{
+        PROC_FLAGS f;
+        uint8_t v;
+    } flags;
 
-    //PROCESSOR FLAG STATES
-    uint8_t  C : 1; //carry flag | set if last operation caused oveflow from bit 7 or underflow of from bit 0
-    uint8_t  Z : 1; //zero flag | set if result of last operation was zero
-    uint8_t  I : 1; //interrupt disable | while set, processor will not respond to interrupts
-    uint8_t  D : 1; //decimal mode |
-    uint8_t  B : 1; //break mode
-    uint8_t  O : 1; //overflow flag
-    uint8_t  N : 1; //negative flag
 }r_6502;
 
 typedef struct{

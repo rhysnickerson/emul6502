@@ -4,8 +4,9 @@
 
 #include "cpu6502.h"
 
-#define F_ZERO(v) CPU->REG.Z = (v==0)
-#define F_NEG(v) CPU->REG.N = (v>>7)==1
+#define flags(c) c->REG.flags.f
+#define F_ZERO(v) flags(CPU).Z = (v==0)
+#define F_NEG(v) flags(CPU).N = (v>>7)==1
 
 c_6502* c_init(){
     c_6502* CPU = malloc(sizeof(c_6502));
@@ -26,7 +27,8 @@ void m_reset(c_6502* CPU){
 void r_reset(r_6502* REG){
     REG->PC = 0x0000; //TODO: CHANGE TO RESET TO RELAVENT POINT
     REG->A = REG->X = REG->Y = 0x00;
-    REG->C = REG->Z = REG->I = REG->D = REG->B = REG->O = REG->N = 0;
+    PROC_FLAGS* flags = &REG->flags.f;
+    flags->C = flags->Z = flags->I = flags->D = flags->B = flags->O = flags->N = 0;
 }
 uint8_t  fetch_byte(c_6502* CPU){
     uint8_t byte = CPU->MEM[CPU->REG.PC];
@@ -100,11 +102,13 @@ void gen_TRANS(c_6502* CPU, uint8_t* REG_D, uint8_t* REG_T){
     F_ZERO(*REG_D);
     F_NEG(*REG_D);
 }
+
+
 /*TODO:
  * Using: http://www.obelisk.me.uk/6502/instructions.html
  * Load and Store - add all addressing modes
  * Register transfers DONE
- * Stack operations PHA PHP PLA PLP
+ * Stack operations DONE
  * logical
  * arithmetic
  * increments decrements
@@ -199,6 +203,25 @@ int execute(c_6502* CPU){
             gen_TRANS(CPU, &CPU->REG.A, &CPU->REG.Y);
             break;
 
+       /*PHA - push accumulator */
+        case 0x48:
+            CPU->REG.S --;
+            store_byte(CPU, (0x0100 | CPU->REG.S), CPU->REG.A);
+            break;
+        /*PHP - push processor status */
+        case 0x08:
+            CPU->REG.S --;
+            store_byte(CPU, (0x0100 | CPU->REG.S), CPU->REG.flags.v);
+            break;
+        /*PLA - pul accumulator */
+        case 0x68:
+            CPU->REG.A = load_byte(CPU, CPU->REG.S);
+            CPU->REG.S ++;
+            break;
+        /*PLP - pull processor status */
+            CPU->REG.flags.v = load_byte(CPU, CPU->REG.S);
+            CPU->REG.S ++;
+            break;
         default:
             return 1;
     }
