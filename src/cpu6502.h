@@ -77,8 +77,7 @@ typedef struct{
     uint8_t MEM[0xFFFF]; // processor memory
     /* 64kB indexed from 0x0000 to 0xffff
      * 0x0100-0x01ff STACK
-     * 0x0600-0x0
-     *
+     * 0x0600-0x06ff
      */
 
     r_6502 REG;

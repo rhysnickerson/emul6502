@@ -31,7 +31,7 @@ void m_reset(c_6502* CPU){
 }
 void r_reset(c_6502 * CPU){
     r_6502* REG = &CPU->REG;
-    REG->PC = CPU->ROM_HEADER; //TODO: CHANGE TO RESET TO RELAVENT POINT
+    REG->PC = CPU->ROM_HEADER; //TODO: CHANGE TO RESET TO RELEVANT POINT
     REG->A = REG->X = REG->Y = 0;
     REG->S = 0xFF;
     PROC_FLAGS* flags = &REG->flags.f;
@@ -159,6 +159,14 @@ void gen_CMP(c_6502* CPU, uint8_t* REG, ADDR_MD AM){
     flags(CPU).Z = *REG==byte;
     flags(CPU).N = !flags(CPU).C;
 }
+void gen_INC(c_6502* CPU, int8_t inc, ADDR_MD AM){
+    uint16_t addr = get_addr(CPU, AM);
+    uint8_t byte = load_byte(CPU,addr);
+    byte += inc;
+    F_ZERO(byte);
+    F_NEG(byte);
+    store_byte(CPU,addr, byte);
+}
 /*TODO:
  * Using: http://www.obelisk.me.uk/6502/instructions.html
  * Load and Store DONE?
@@ -166,7 +174,7 @@ void gen_CMP(c_6502* CPU, uint8_t* REG, ADDR_MD AM){
  * Stack operations DONE
  * logical DONE?
  * arithmetic DONE?
- * increments decrements
+ * increments decrements DONE
  * shifts
  * jumps & calls
  * branches
@@ -508,6 +516,61 @@ int execute(c_6502* CPU){
             gen_CMP(CPU,&CPU->REG.Y,AM_ABS);
             break;
 
+        /*INC - increment memory */
+        case 0xE6: //zero page
+            gen_INC(CPU,1,AM_ZP);
+            break;
+        case 0xF6: //zero page X
+            gen_INC(CPU,1,AM_ZPX);
+            break;
+        case 0xEE: //absolute
+            gen_INC(CPU,1,AM_ABS);
+            break;
+        case 0xFF: //absolute X
+            gen_INC(CPU,1,AM_ABSX);
+            break;
+
+        /*DEC - decrement memory */
+        case 0xC6: //zero page
+            gen_INC(CPU,-1,AM_ZP);
+            break;
+        case 0xD6: //zero page X
+            gen_INC(CPU,-1,AM_ZPX);
+            break;
+        case 0xCE: //absolute
+            gen_INC(CPU,-1,AM_ABS);
+            break;
+        case 0xDF: //absolute X
+            gen_INC(CPU,-1,AM_ABSX);
+            break;
+
+        /*INX - increment X register */
+        case 0xE8: //implied
+            CPU->REG.X ++;
+            F_ZERO(CPU->REG.X);
+            F_NEG(CPU->REG.X);
+            break;
+        /*DEX - decrement X register */
+        case 0xCA: //implied
+            CPU->REG.X --;
+            F_ZERO(CPU->REG.X);
+            F_NEG(CPU->REG.X);
+            break;
+        /*INY - increment Y register */
+        case 0xC8: //implied
+            CPU->REG.Y ++;
+            F_ZERO(CPU->REG.Y);
+            F_NEG(CPU->REG.Y);
+            break;
+        /*DEY - decrement Y register */
+        case 0x88: //implied
+            CPU->REG.Y --;
+            F_ZERO(CPU->REG.Y);
+            F_NEG(CPU->REG.Y);
+            break;
+
+        /*ASL - arithmetic shift left */
+        case 0x0A:
 
         default:
             printf("Unknown instruction: %x \n. Exiting",instr);
