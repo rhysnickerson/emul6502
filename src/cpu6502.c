@@ -33,6 +33,7 @@ void r_reset(c_6502 * CPU){
     r_6502* REG = &CPU->REG;
     REG->PC = CPU->ROM_HEADER; //TODO: CHANGE TO RESET TO RELAVENT POINT
     REG->A = REG->X = REG->Y = 0;
+    REG->S = 0xFF;
     PROC_FLAGS* flags = &REG->flags.f;
     flags->C = flags->Z = flags->I = flags->D = flags->B = flags->V = flags->N = 0;
 }
@@ -152,14 +153,19 @@ void gen_SUB(c_6502* CPU, ADDR_MD AM){
     F_ZERO(CPU->REG.A);
     F_NEG(CPU->REG.A);
 }
-
+void gen_CMP(c_6502* CPU, uint8_t* REG, ADDR_MD AM){
+    uint8_t byte = get_byte(CPU,AM);
+    flags(CPU).C = *REG>=byte;
+    flags(CPU).Z = *REG==byte;
+    flags(CPU).N = !flags(CPU).C;
+}
 /*TODO:
  * Using: http://www.obelisk.me.uk/6502/instructions.html
  * Load and Store DONE?
  * Register transfers DONE
  * Stack operations DONE
  * logical DONE?
- * arithmetic
+ * arithmetic DONE?
  * increments decrements
  * shifts
  * jumps & calls
@@ -191,8 +197,7 @@ int execute(c_6502* CPU){
             gen_LD(CPU,&CPU->REG.A,AM_ABSY);
             break;
         case 0xA1: //(indirect,X)
-            gen_LD(CPU,&CPU->REG.A,AM_INDX);
-            break;
+            gen_LD(CPU,&CPU->REG.A,AM_INDX); break;
         case 0xB1: //(indirect),Y
             gen_LD(CPU,&CPU->REG.A,AM_INDY);
             break;
@@ -454,6 +459,55 @@ int execute(c_6502* CPU){
         case 0xF1:  //indirect Y
             gen_SUB(CPU,AM_INDY);
             break;
+
+        /* CMP - Compare */
+        case 0xC9: //immediate
+            gen_CMP(CPU,&CPU->REG.A,AM_IMM) ;
+            break;
+        case 0xC5: //zero page
+            gen_CMP(CPU,&CPU->REG.A,AM_ZP) ;
+            break;
+        case 0xD5: //zero page X
+            gen_CMP(CPU,&CPU->REG.A,AM_ZPX) ;
+            break;
+        case 0xCD: //Absolute
+            gen_CMP(CPU,&CPU->REG.A,AM_ABS) ;
+            break;
+        case 0xDD: //Absolute X
+            gen_CMP(CPU,&CPU->REG.A,AM_ABSX) ;
+            break;
+        case 0xD9: //Absolute Y
+            gen_CMP(CPU,&CPU->REG.A,AM_ABSY) ;
+            break;
+        case 0xC1: //Indirect X
+            gen_CMP(CPU,&CPU->REG.A,AM_INDX) ;
+            break;
+        case 0xD1: //Indirect Y
+            gen_CMP(CPU,&CPU->REG.A,AM_INDY) ;
+            break;
+
+        /*CPX - compare X */
+        case 0xE0: //immediate
+            gen_CMP(CPU,&CPU->REG.X,AM_IMM);
+            break;
+        case 0xE4: //zero paged
+            gen_CMP(CPU,&CPU->REG.X,AM_ZP);
+            break;
+        case 0xEC: //absolute
+            gen_CMP(CPU,&CPU->REG.X,AM_ABS);
+            break;
+
+        /*CPY - compare Y */
+        case 0xC0: //immediate
+            gen_CMP(CPU,&CPU->REG.Y,AM_IMM);
+            break;
+        case 0xC4: //zero paged
+            gen_CMP(CPU,&CPU->REG.Y,AM_ZP);
+            break;
+        case 0xCC: //absolute
+            gen_CMP(CPU,&CPU->REG.Y,AM_ABS);
+            break;
+
 
         default:
             printf("Unknown instruction: %x \n. Exiting",instr);
